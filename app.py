@@ -11,27 +11,22 @@ import seaborn as sns
 # -------------------------------------------------
 # PAGE CONFIG
 # -------------------------------------------------
-st.set_page_config(
-    page_title="Car MPG Analytics Dashboard",
-    page_icon="🚗",
-    layout="wide"
-)
+col1, col2, col3 = st.columns(3)
 
-# -------------------------------------------------
-# CUSTOM CSS (Premium Look)
-# -------------------------------------------------
-st.markdown("""
-<style>
-.main {background-color: #0E1117;}
-h1, h2, h3 {color: #FFFFFF;}
-.metric-container {
-    background-color: #1C1F26;
-    padding: 15px;
-    border-radius: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
+with col1:
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Linear Regression R²", round(lin_r2,4))
+    st.markdown('</div>', unsafe_allow_html=True)
 
+with col2:
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Ridge Regression R²", round(ridge_r2,4))
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col3:
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.metric("Lasso Regression R²", round(lasso_r2,4))
+    st.markdown('</div>', unsafe_allow_html=True)
 st.title("🚗 Car MPG Enterprise Analytics Dashboard")
 st.markdown("### Comparative Analysis of Linear, Ridge & Lasso Regression")
 

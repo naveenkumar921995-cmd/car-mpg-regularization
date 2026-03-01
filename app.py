@@ -2,25 +2,42 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score, mean_squared_error
-import math
+from sklearn.metrics import r2_score
+import seaborn as sns
 
-# -------------------------------
-# Page Configuration
-# -------------------------------
-st.set_page_config(page_title="Car MPG Prediction", layout="wide")
+# -------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------
+st.set_page_config(
+    page_title="Car MPG Analytics Dashboard",
+    page_icon="🚗",
+    layout="wide"
+)
 
-st.title("🚗 Car MPG Prediction using Regularization")
-st.markdown("Compare **Linear, Ridge & Lasso Regression** on Car MPG Dataset")
+# -------------------------------------------------
+# CUSTOM CSS (Premium Look)
+# -------------------------------------------------
+st.markdown("""
+<style>
+.main {background-color: #0E1117;}
+h1, h2, h3 {color: #FFFFFF;}
+.metric-container {
+    background-color: #1C1F26;
+    padding: 15px;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# -------------------------------
-# Load Dataset
-# -------------------------------
+st.title("🚗 Car MPG Enterprise Analytics Dashboard")
+st.markdown("### Comparative Analysis of Linear, Ridge & Lasso Regression")
+
+# -------------------------------------------------
+# LOAD DATA
+# -------------------------------------------------
 @st.cache_data
 def load_data():
     data = pd.read_csv("car-mpg.csv")
@@ -34,145 +51,151 @@ def load_data():
 
 data = load_data()
 
-# -------------------------------
-# Feature & Target
-# -------------------------------
-X = data.drop(['mpg'], axis=1)
-y = data[['mpg']]
+X = data.drop("mpg", axis=1)
+y = data["mpg"]
 
-# -------------------------------
 # Scaling
-# -------------------------------
 scaler_X = StandardScaler()
-scaler_y = StandardScaler()
-
 X_scaled = scaler_X.fit_transform(X)
-y_scaled = scaler_y.fit_transform(y)
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X_scaled, y_scaled, test_size=0.30, random_state=1
+    X_scaled, y, test_size=0.30, random_state=42
 )
 
-# -------------------------------
-# Sidebar Controls
-# -------------------------------
-st.sidebar.header("⚙ Model Settings")
+# -------------------------------------------------
+# SIDEBAR
+# -------------------------------------------------
+st.sidebar.header("⚙ Model Controls")
+alpha = st.sidebar.slider("Alpha (Regularization Strength)", 0.01, 10.0, 0.3)
 
-model_choice = st.sidebar.selectbox(
-    "Choose Model",
-    ("Linear Regression", "Ridge Regression", "Lasso Regression")
-)
+# -------------------------------------------------
+# TRAIN MODELS
+# -------------------------------------------------
+linear = LinearRegression()
+ridge = Ridge(alpha=alpha)
+lasso = Lasso(alpha=alpha, max_iter=10000)
 
-alpha = st.sidebar.slider(
-    "Select Alpha (Regularization Strength)",
-    min_value=0.01,
-    max_value=10.0,
-    value=0.3
-)
-
-# -------------------------------
-# Model Selection
-# -------------------------------
-if model_choice == "Linear Regression":
-    model = LinearRegression()
-elif model_choice == "Ridge Regression":
-    model = Ridge(alpha=alpha)
-else:
-    model = Lasso(alpha=alpha)
-
-# -------------------------------
-# Train Model
-# -------------------------------
-model.fit(X_train, y_train)
+linear.fit(X_train, y_train)
+ridge.fit(X_train, y_train)
+lasso.fit(X_train, y_train)
 
 # Predictions
-y_train_pred = model.predict(X_train)
-y_test_pred = model.predict(X_test)
+lin_pred = linear.predict(X_test)
+ridge_pred = ridge.predict(X_test)
+lasso_pred = lasso.predict(X_test)
 
-# Metrics
-train_r2 = r2_score(y_train, y_train_pred)
-test_r2 = r2_score(y_test, y_test_pred)
-mse = mean_squared_error(y_test, y_test_pred)
-rmse = math.sqrt(mse)
+# R2 Scores
+lin_r2 = r2_score(y_test, lin_pred)
+ridge_r2 = r2_score(y_test, ridge_pred)
+lasso_r2 = r2_score(y_test, lasso_pred)
 
-# -------------------------------
-# Display Metrics
-# -------------------------------
+# -------------------------------------------------
+# KPI SECTION
+# -------------------------------------------------
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Train R²", round(train_r2, 4))
-col2.metric("Test R²", round(test_r2, 4))
-col3.metric("RMSE", round(rmse, 4))
+col1.metric("Linear Regression R²", round(lin_r2,4))
+col2.metric("Ridge Regression R²", round(ridge_r2,4))
+col3.metric("Lasso Regression R²", round(lasso_r2,4))
 
 st.markdown("---")
 
-# -------------------------------
-# Coefficient Visualization
-# -------------------------------
-st.subheader("📊 Model Coefficients")
+# -------------------------------------------------
+# R2 COMPARISON CHART
+# -------------------------------------------------
+st.subheader("📊 Model Performance Comparison")
 
-coef = pd.Series(model.coef_.flatten(), index=X.columns)
-coef_df = coef.sort_values()
+r2_df = pd.DataFrame({
+    "Model": ["Linear", "Ridge", "Lasso"],
+    "R2 Score": [lin_r2, ridge_r2, lasso_r2]
+})
 
-fig, ax = plt.subplots(figsize=(10,6))
-coef_df.plot(kind='barh', ax=ax)
-ax.set_title("Feature Coefficient Importance")
-st.pyplot(fig)
+fig1, ax1 = plt.subplots(figsize=(8,5))
+ax1.bar(r2_df["Model"], r2_df["R2 Score"])
+ax1.set_ylim(0,1)
+ax1.set_ylabel("R² Score")
+st.pyplot(fig1)
 
-# -------------------------------
-# Prediction Section
-# -------------------------------
+# -------------------------------------------------
+# ALPHA IMPACT VISUALIZATION
+# -------------------------------------------------
+st.subheader("📈 Impact of Alpha on Ridge & Lasso")
+
+alphas = np.linspace(0.01, 5, 50)
+ridge_scores = []
+lasso_scores = []
+
+for a in alphas:
+    ridge_temp = Ridge(alpha=a)
+    lasso_temp = Lasso(alpha=a, max_iter=10000)
+    ridge_temp.fit(X_train, y_train)
+    lasso_temp.fit(X_train, y_train)
+    ridge_scores.append(r2_score(y_test, ridge_temp.predict(X_test)))
+    lasso_scores.append(r2_score(y_test, lasso_temp.predict(X_test)))
+
+fig2, ax2 = plt.subplots(figsize=(8,5))
+ax2.plot(alphas, ridge_scores, label="Ridge")
+ax2.plot(alphas, lasso_scores, label="Lasso")
+ax2.set_xlabel("Alpha")
+ax2.set_ylabel("R² Score")
+ax2.legend()
+st.pyplot(fig2)
+
+# -------------------------------------------------
+# COEFFICIENT ANALYSIS
+# -------------------------------------------------
+st.subheader("📌 Coefficient Shrinkage Analysis")
+
+coef_df = pd.DataFrame({
+    "Feature": X.columns,
+    "Linear": linear.coef_,
+    "Ridge": ridge.coef_,
+    "Lasso": lasso.coef_
+})
+
+coef_df = coef_df.set_index("Feature")
+
+fig3, ax3 = plt.subplots(figsize=(10,6))
+coef_df.plot(kind="bar", ax=ax3)
+st.pyplot(fig3)
+
+# -------------------------------------------------
+# PREDICTION MODULE
+# -------------------------------------------------
 st.markdown("---")
-st.subheader("🔮 Predict MPG for New Car")
+st.subheader("🔮 Predict MPG")
 
 input_data = {}
+cols = st.columns(2)
 
-col1, col2 = st.columns(2)
-
-with col1:
+with cols[0]:
     input_data["cyl"] = st.number_input("Cylinders", 3, 12, 4)
     input_data["disp"] = st.number_input("Displacement", 50.0, 500.0, 150.0)
     input_data["hp"] = st.number_input("Horsepower", 40.0, 300.0, 100.0)
     input_data["wt"] = st.number_input("Weight", 1500.0, 5000.0, 2500.0)
 
-with col2:
+with cols[1]:
     input_data["acc"] = st.number_input("Acceleration", 8.0, 25.0, 15.0)
     input_data["yr"] = st.number_input("Model Year", 70, 82, 76)
+    origin = st.selectbox("Origin", ["america", "europe", "asia"])
 
-origin = st.selectbox("Origin", ["america", "europe", "asia"])
-
-# Create dataframe for prediction
 if st.button("Predict MPG"):
-
     input_df = pd.DataFrame([input_data])
-
-    # Add origin columns
-    input_df["origin_america"] = 1 if origin == "america" else 0
-    input_df["origin_europe"] = 1 if origin == "europe" else 0
-    input_df["origin_asia"] = 1 if origin == "asia" else 0
-
-    # Ensure column order
+    input_df["origin_america"] = 1 if origin=="america" else 0
+    input_df["origin_europe"] = 1 if origin=="europe" else 0
+    input_df["origin_asia"] = 1 if origin=="asia" else 0
     input_df = input_df[X.columns]
-
-    # Scale input
     input_scaled = scaler_X.transform(input_df)
+    prediction = ridge.predict(input_scaled)
+    st.success(f"🚗 Estimated MPG: {round(prediction[0],2)}")
 
-    # Predict
-    prediction_scaled = model.predict(input_scaled)
+# -------------------------------------------------
+# RESIDUAL PLOT
+# -------------------------------------------------
+st.subheader("📉 Residual Analysis (Ridge Model)")
 
-    # Inverse transform
-    prediction = scaler_y.inverse_transform(prediction_scaled)
-
-    st.success(f"🚗 Predicted MPG: {prediction[0][0]:.2f}")
-
-# -------------------------------
-# Residual Plot
-# -------------------------------
-st.markdown("---")
-st.subheader("📉 Residual Analysis")
-
-fig2, ax2 = plt.subplots(figsize=(8,5))
-sns.residplot(x=y_test.flatten(), y=y_test_pred.flatten(), lowess=True, ax=ax2)
-ax2.set_xlabel("Actual MPG (Scaled)")
-ax2.set_ylabel("Residuals")
-st.pyplot(fig2)
+fig4, ax4 = plt.subplots(figsize=(8,5))
+sns.residplot(x=y_test, y=ridge_pred, lowess=True, ax=ax4)
+ax4.set_xlabel("Actual MPG")
+ax4.set_ylabel("Residuals")
+st.pyplot(fig4)

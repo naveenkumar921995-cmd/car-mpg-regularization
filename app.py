@@ -195,7 +195,7 @@ if st.button("Predict MPG"):
 st.subheader("📉 Residual Analysis (Ridge Model)")
 
 fig4, ax4 = plt.subplots(figsize=(8,5))
-sns.residplot(x=y_test, y=ridge_pred, lowess=True, ax=ax4)
+sns.residplot(x=y_test, y=ridge_pred, ax=ax4)
 ax4.set_xlabel("Actual MPG")
 ax4.set_ylabel("Residuals")
 st.pyplot(fig4)

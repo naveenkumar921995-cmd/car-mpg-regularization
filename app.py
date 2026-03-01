@@ -1,140 +1,178 @@
-# Import numerical libraries
+import streamlit as st
 import pandas as pd
 import numpy as np
-
-# Import graphical plotting libraries
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Import ML libraries
-from sklearn.preprocessing import PolynomialFeatures
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.metrics import r2_score
-
-# Load dataset
-data = pd.read_csv("car-mpg.csv")
-
-print(data.head())
-
-# Drop car_name
-data = data.drop(['car_name'], axis=1)
-
-# Replace '?' with NaN FIRST
-data = data.replace('?', np.nan)
-
-# Convert all possible columns to numeric safely
-data = data.apply(pd.to_numeric, errors='coerce')
-
-# Replace origin numbers AFTER conversion
-data['origin'] = data['origin'].replace({1: 'america', 2: 'europe', 3: 'asia'})
-
-# One-hot encoding
-data = pd.get_dummies(data, columns=['origin'])
-
-# Fill missing numeric values with median
-data = data.fillna(data.median(numeric_only=True))
-
-print(data.head())
-
-X = data.drop(['mpg'], axis = 1) # independent variable
-y = data[['mpg']] #dependent variable
-
-#Scaling the data
-from sklearn import preprocessing
-X_s = preprocessing.scale(X)
-X_s = pd.DataFrame(X_s, columns = X.columns) #converting scaled data into dataframe
-
-y_s = preprocessing.scale(y)
-y_s = pd.DataFrame(y_s, columns = y.columns) #ideally train, test data should be in columns
-
-#Split into train, test set
-
-X_train, X_test, y_train,y_test = train_test_split(X_s, y_s, test_size = 0.30, random_state = 1)
-X_train.shape
-
-#Fit simple linear model and find coefficients
-regression_model = LinearRegression()
-regression_model.fit(X_train, y_train)
-
-for idx, col_name in enumerate(X_train.columns):
-    print('The coefficient for {} is {}'.format(col_name, regression_model.coef_[0][idx]))
-    
-intercept = regression_model.intercept_[0]
-print('The intercept is {}'.format(intercept))
-
-#alpha factor here is lambda (penalty term) which helps to reduce the magnitude of coeff
-
-ridge_model = Ridge(alpha = 0.3)
-ridge_model.fit(X_train, y_train)
-
-print('Ridge model coef: {}'.format(ridge_model.coef_))
-#As the data has 10 columns hence 10 coefficients appear here 
-
-#alpha factor here is lambda (penalty term) which helps to reduce the magnitude of coeff
-
-lasso_model = Lasso(alpha = 0.1)
-lasso_model.fit(X_train, y_train)
-
-print('Lasso model coef: {}'.format(lasso_model.coef_))
-#As the data has 10 columns hence 10 coefficients appear here   
-
-#Model score - r^2 or coeff of determinant
-#r^2 = 1-(RSS/TSS) = Regression error/TSS 
-
-
-#Simple Linear Model
-print(regression_model.score(X_train, y_train))
-print(regression_model.score(X_test, y_test))
-
-print('*************************')
-#Ridge
-print(ridge_model.score(X_train, y_train))
-print(ridge_model.score(X_test, y_test))
-
-print('*************************')
-#Lasso
-print(lasso_model.score(X_train, y_train))
-print(lasso_model.score(X_test, y_test))
-
-#poly = PolynomialFeatures(degree = 2, interaction_only = True)
-
-#Fit calculates u and std dev while transform applies the transformation to a particular set of examples
-#Here fit_transform helps to fit and transform the X_s
-#Hence type(X_poly) is numpy.array while type(X_s) is pandas.DataFrame 
-#X_poly = poly.fit_transform(X_s)
-#Similarly capture the coefficients and intercepts of this polynomial feature model
-
-data_train_test = pd.concat([X_train, y_train], axis =1)
-data_train_test.head()
-
-import statsmodels.formula.api as smf
-ols1 = smf.ols(formula = 'mpg ~ cyl+disp+hp+wt+acc+yr+car_type+origin_america+origin_europe+origin_asia', data = data_train_test).fit()
-ols1.params
-
-print(ols1.summary())
-
-#Lets check Sum of Squared Errors (SSE) by predicting value of y for test cases and subtracting from the actual y for the test cases
-mse  = np.mean((regression_model.predict(X_test)-y_test)**2)
-
-# root of mean_sq_error is standard deviation i.e. avg variance between predicted and actual
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score, mean_squared_error
 import math
+
+# -------------------------------
+# Page Configuration
+# -------------------------------
+st.set_page_config(page_title="Car MPG Prediction", layout="wide")
+
+st.title("🚗 Car MPG Prediction using Regularization")
+st.markdown("Compare **Linear, Ridge & Lasso Regression** on Car MPG Dataset")
+
+# -------------------------------
+# Load Dataset
+# -------------------------------
+@st.cache_data
+def load_data():
+    data = pd.read_csv("car-mpg.csv")
+    data = data.drop(['car_name'], axis=1)
+    data = data.replace('?', np.nan)
+    data = data.apply(pd.to_numeric, errors='coerce')
+    data['origin'] = data['origin'].replace({1: 'america', 2: 'europe', 3: 'asia'})
+    data = pd.get_dummies(data, columns=['origin'])
+    data = data.fillna(data.median(numeric_only=True))
+    return data
+
+data = load_data()
+
+# -------------------------------
+# Feature & Target
+# -------------------------------
+X = data.drop(['mpg'], axis=1)
+y = data[['mpg']]
+
+# -------------------------------
+# Scaling
+# -------------------------------
+scaler_X = StandardScaler()
+scaler_y = StandardScaler()
+
+X_scaled = scaler_X.fit_transform(X)
+y_scaled = scaler_y.fit_transform(y)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_scaled, test_size=0.30, random_state=1
+)
+
+# -------------------------------
+# Sidebar Controls
+# -------------------------------
+st.sidebar.header("⚙ Model Settings")
+
+model_choice = st.sidebar.selectbox(
+    "Choose Model",
+    ("Linear Regression", "Ridge Regression", "Lasso Regression")
+)
+
+alpha = st.sidebar.slider(
+    "Select Alpha (Regularization Strength)",
+    min_value=0.01,
+    max_value=10.0,
+    value=0.3
+)
+
+# -------------------------------
+# Model Selection
+# -------------------------------
+if model_choice == "Linear Regression":
+    model = LinearRegression()
+elif model_choice == "Ridge Regression":
+    model = Ridge(alpha=alpha)
+else:
+    model = Lasso(alpha=alpha)
+
+# -------------------------------
+# Train Model
+# -------------------------------
+model.fit(X_train, y_train)
+
+# Predictions
+y_train_pred = model.predict(X_train)
+y_test_pred = model.predict(X_test)
+
+# Metrics
+train_r2 = r2_score(y_train, y_train_pred)
+test_r2 = r2_score(y_test, y_test_pred)
+mse = mean_squared_error(y_test, y_test_pred)
 rmse = math.sqrt(mse)
-print('Root Mean Squared Error: {}'.format(rmse))
 
-#Is OLS a good model ? Lets check the residuals for some of these predictor.
+# -------------------------------
+# Display Metrics
+# -------------------------------
+col1, col2, col3 = st.columns(3)
 
-fig = plt.figure(figsize=(10,8))
-sns.residplot(x= X_test['hp'], y= y_test['mpg'], color='green', lowess=True )
+col1.metric("Train R²", round(train_r2, 4))
+col2.metric("Test R²", round(test_r2, 4))
+col3.metric("RMSE", round(rmse, 4))
 
+st.markdown("---")
 
-fig = plt.figure(figsize=(10,8))
-sns.residplot(x= X_test['acc'], y= y_test['mpg'], color='green', lowess=True )
+# -------------------------------
+# Coefficient Visualization
+# -------------------------------
+st.subheader("📊 Model Coefficients")
 
-# predict mileage (mpg) for a set of attributes not in the training or test set
-y_pred = regression_model.predict(X_test)
+coef = pd.Series(model.coef_.flatten(), index=X.columns)
+coef_df = coef.sort_values()
 
-# Since this is regression, plot the predicted y value vs actual y values for the test data
-# A good model's prediction will be close to actual leading to high R and R2 values
-#plt.rcParams['figure.dpi'] = 500
-plt.scatter(y_test['mpg'], y_pred)
+fig, ax = plt.subplots(figsize=(10,6))
+coef_df.plot(kind='barh', ax=ax)
+ax.set_title("Feature Coefficient Importance")
+st.pyplot(fig)
+
+# -------------------------------
+# Prediction Section
+# -------------------------------
+st.markdown("---")
+st.subheader("🔮 Predict MPG for New Car")
+
+input_data = {}
+
+col1, col2 = st.columns(2)
+
+with col1:
+    input_data["cyl"] = st.number_input("Cylinders", 3, 12, 4)
+    input_data["disp"] = st.number_input("Displacement", 50.0, 500.0, 150.0)
+    input_data["hp"] = st.number_input("Horsepower", 40.0, 300.0, 100.0)
+    input_data["wt"] = st.number_input("Weight", 1500.0, 5000.0, 2500.0)
+
+with col2:
+    input_data["acc"] = st.number_input("Acceleration", 8.0, 25.0, 15.0)
+    input_data["yr"] = st.number_input("Model Year", 70, 82, 76)
+
+origin = st.selectbox("Origin", ["america", "europe", "asia"])
+
+# Create dataframe for prediction
+if st.button("Predict MPG"):
+
+    input_df = pd.DataFrame([input_data])
+
+    # Add origin columns
+    input_df["origin_america"] = 1 if origin == "america" else 0
+    input_df["origin_europe"] = 1 if origin == "europe" else 0
+    input_df["origin_asia"] = 1 if origin == "asia" else 0
+
+    # Ensure column order
+    input_df = input_df[X.columns]
+
+    # Scale input
+    input_scaled = scaler_X.transform(input_df)
+
+    # Predict
+    prediction_scaled = model.predict(input_scaled)
+
+    # Inverse transform
+    prediction = scaler_y.inverse_transform(prediction_scaled)
+
+    st.success(f"🚗 Predicted MPG: {prediction[0][0]:.2f}")
+
+# -------------------------------
+# Residual Plot
+# -------------------------------
+st.markdown("---")
+st.subheader("📉 Residual Analysis")
+
+fig2, ax2 = plt.subplots(figsize=(8,5))
+sns.residplot(x=y_test.flatten(), y=y_test_pred.flatten(), lowess=True, ax=ax2)
+ax2.set_xlabel("Actual MPG (Scaled)")
+ax2.set_ylabel("Residuals")
+st.pyplot(fig2)

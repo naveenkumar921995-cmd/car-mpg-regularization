@@ -1,1 +1,36 @@
+import pandas as pd
+import numpy as np
+import pickle
 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import StandardScaler
+
+# Load dataset
+data = pd.read_csv("car-mpg.csv")
+
+data = data.drop(['car_name'], axis=1)
+data = data.replace('?', np.nan)
+data = data.apply(pd.to_numeric, errors='coerce')
+
+data['origin'] = data['origin'].replace({1:'america',2:'europe',3:'asia'})
+data = pd.get_dummies(data, columns=['origin'])
+data = data.fillna(data.median(numeric_only=True))
+
+X = data.drop("mpg", axis=1)
+y = data["mpg"]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.3, random_state=42
+)
+
+model = Ridge(alpha=0.3)
+model.fit(X_train, y_train)
+
+# Save model
+pickle.dump(model, open("car_price_model.pkl", "wb"))
+
+print("Model saved successfully")

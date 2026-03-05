@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
@@ -12,33 +13,34 @@ from sklearn.metrics import r2_score
 # PAGE CONFIG
 # ---------------------------------------------------
 st.set_page_config(
-    page_title="Car MPG Enterprise Dashboard",
+    page_title="Car MPG ML Dashboard",
     page_icon="🚗",
     layout="wide"
 )
 
-st.title("🚗 Car MPG Enterprise Analytics Dashboard")
-st.markdown("### Linear vs Ridge vs Lasso Regression Comparison")
+st.title("🚗 Car MPG Machine Learning Dashboard")
+st.markdown("### Linear vs Ridge vs Lasso Regression Analysis")
 
 # ---------------------------------------------------
-# LOAD DATA (CACHED)
+# LOAD DATA
 # ---------------------------------------------------
 @st.cache_data
 def load_data():
+
     data = pd.read_csv("car-mpg.csv")
 
-    data = data.drop(['car_name'], axis=1)
+    data = data.drop(["car_name"], axis=1)
 
-    data = data.replace('?', np.nan)
-    data = data.apply(pd.to_numeric, errors='coerce')
+    data = data.replace("?", np.nan)
+    data = data.apply(pd.to_numeric, errors="coerce")
 
-    data['origin'] = data['origin'].replace({
-        1: 'america',
-        2: 'europe',
-        3: 'asia'
+    data["origin"] = data["origin"].replace({
+        1:"america",
+        2:"europe",
+        3:"asia"
     })
 
-    data = pd.get_dummies(data, columns=['origin'])
+    data = pd.get_dummies(data, columns=["origin"])
 
     data = data.fillna(data.median(numeric_only=True))
 
@@ -47,25 +49,20 @@ def load_data():
 data = load_data()
 
 # ---------------------------------------------------
-# CORRELATION HEATMAP
+# CORRELATION HEATMAP (PLOTLY)
 # ---------------------------------------------------
 st.subheader("📊 Feature Correlation Heatmap")
 
-fig_corr, ax_corr = plt.subplots(figsize=(10,6))
-
 corr = data.corr()
 
-im = ax_corr.imshow(corr)
+fig_corr = px.imshow(
+    corr,
+    text_auto=True,
+    aspect="auto",
+    color_continuous_scale="RdBu_r"
+)
 
-ax_corr.set_xticks(range(len(corr.columns)))
-ax_corr.set_yticks(range(len(corr.columns)))
-
-ax_corr.set_xticklabels(corr.columns, rotation=90)
-ax_corr.set_yticklabels(corr.columns)
-
-fig_corr.colorbar(im)
-
-st.pyplot(fig_corr)
+st.plotly_chart(fig_corr, use_container_width=True)
 
 # ---------------------------------------------------
 # PREPROCESSING
@@ -92,7 +89,7 @@ def prepare_data(data):
 X, y, X_train, X_test, y_train, y_test, scaler = prepare_data(data)
 
 # ---------------------------------------------------
-# SIDEBAR INPUTS
+# SIDEBAR CONTROLS
 # ---------------------------------------------------
 st.sidebar.header("⚙ Model Controls")
 
@@ -104,24 +101,19 @@ alpha = st.sidebar.slider(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.header("🚗 Car Specification Input")
+st.sidebar.header("🚗 Car Input")
 
-cyl = st.sidebar.number_input("Cylinders", 3, 12, 4)
-disp = st.sidebar.number_input("Displacement", 50.0, 500.0, 150.0)
-hp = st.sidebar.number_input("Horsepower", 40.0, 300.0, 100.0)
-wt = st.sidebar.number_input("Weight", 1500.0, 5000.0, 2500.0)
-acc = st.sidebar.number_input("Acceleration", 8.0, 25.0, 15.0)
+cyl = st.sidebar.number_input("Cylinders",3,12,4)
+disp = st.sidebar.number_input("Displacement",50.0,500.0,150.0)
+hp = st.sidebar.number_input("Horsepower",40.0,300.0,100.0)
+wt = st.sidebar.number_input("Weight",1500.0,5000.0,2500.0)
+acc = st.sidebar.number_input("Acceleration",8.0,25.0,15.0)
 
-yr = st.sidebar.number_input(
-    "Model Year",
-    min_value=1970,
-    max_value=2026,
-    value=2020
-)
+yr = st.sidebar.number_input("Model Year",1970,2026,2020)
 
 origin = st.sidebar.selectbox(
     "Origin",
-    ["america", "europe", "asia"]
+    ["america","europe","asia"]
 )
 
 predict_button = st.sidebar.button("Predict MPG")
@@ -136,141 +128,143 @@ def train_models(alpha):
     ridge = Ridge(alpha=alpha)
     lasso = Lasso(alpha=alpha, max_iter=5000)
 
-    linear.fit(X_train, y_train)
-    ridge.fit(X_train, y_train)
-    lasso.fit(X_train, y_train)
+    linear.fit(X_train,y_train)
+    ridge.fit(X_train,y_train)
+    lasso.fit(X_train,y_train)
 
-    return linear, ridge, lasso
+    return linear,ridge,lasso
 
-linear, ridge, lasso = train_models(alpha)
+linear,ridge,lasso = train_models(alpha)
 
 # ---------------------------------------------------
-# PREDICTIONS
+# MODEL PREDICTIONS
 # ---------------------------------------------------
 lin_pred = linear.predict(X_test)
 ridge_pred = ridge.predict(X_test)
 lasso_pred = lasso.predict(X_test)
 
-# ---------------------------------------------------
-# R2 SCORES
-# ---------------------------------------------------
 lin_r2 = r2_score(y_test, lin_pred)
 ridge_r2 = r2_score(y_test, ridge_pred)
 lasso_r2 = r2_score(y_test, lasso_pred)
 
 # ---------------------------------------------------
-# KPI SECTION
+# KPI METRICS
 # ---------------------------------------------------
-st.subheader("📊 Model Performance (R² Score)")
+st.subheader("📊 Model Performance")
 
-col1, col2, col3 = st.columns(3)
+col1,col2,col3 = st.columns(3)
 
-col1.metric("Linear Regression", round(lin_r2, 4))
-col2.metric("Ridge Regression", round(ridge_r2, 4))
-col3.metric("Lasso Regression", round(lasso_r2, 4))
+col1.metric("Linear Regression R²",round(lin_r2,4))
+col2.metric("Ridge Regression R²",round(ridge_r2,4))
+col3.metric("Lasso Regression R²",round(lasso_r2,4))
 
 # ---------------------------------------------------
-# R2 COMPARISON CHART
+# MODEL COMPARISON CHART
 # ---------------------------------------------------
 st.subheader("📈 Model Comparison")
 
-fig1, ax1 = plt.subplots()
-
-ax1.bar(
-    ["Linear", "Ridge", "Lasso"],
-    [lin_r2, ridge_r2, lasso_r2]
+fig_model = px.bar(
+    x=["Linear","Ridge","Lasso"],
+    y=[lin_r2,ridge_r2,lasso_r2],
+    labels={"x":"Model","y":"R² Score"},
+    color=["Linear","Ridge","Lasso"]
 )
 
-ax1.set_ylabel("R² Score")
-ax1.set_ylim(0, 1)
-
-st.pyplot(fig1)
+st.plotly_chart(fig_model, use_container_width=True)
 
 # ---------------------------------------------------
 # ALPHA IMPACT ANALYSIS
 # ---------------------------------------------------
 @st.cache_data
-def compute_alpha_impact():
+def alpha_analysis():
 
-    alphas = np.linspace(0.01, 5, 25)
+    alphas = np.linspace(0.01,5,30)
 
-    ridge_scores = []
-    lasso_scores = []
+    ridge_scores=[]
+    lasso_scores=[]
 
     for a in alphas:
 
-        r = Ridge(alpha=a).fit(X_train, y_train)
-        l = Lasso(alpha=a, max_iter=5000).fit(X_train, y_train)
+        r = Ridge(alpha=a).fit(X_train,y_train)
+        l = Lasso(alpha=a,max_iter=5000).fit(X_train,y_train)
 
         ridge_scores.append(
-            r2_score(y_test, r.predict(X_test))
+            r2_score(y_test,r.predict(X_test))
         )
 
         lasso_scores.append(
-            r2_score(y_test, l.predict(X_test))
+            r2_score(y_test,l.predict(X_test))
         )
 
-    return alphas, ridge_scores, lasso_scores
+    return alphas,ridge_scores,lasso_scores
 
-alphas, ridge_scores, lasso_scores = compute_alpha_impact()
+alphas,ridge_scores,lasso_scores = alpha_analysis()
 
-st.subheader("📉 Impact of Alpha on Model Performance")
+st.subheader("📉 Alpha Impact on Models")
 
-fig2, ax2 = plt.subplots()
+fig_alpha = go.Figure()
 
-ax2.plot(alphas, ridge_scores, label="Ridge")
-ax2.plot(alphas, lasso_scores, label="Lasso")
+fig_alpha.add_trace(
+    go.Scatter(
+        x=alphas,
+        y=ridge_scores,
+        mode="lines+markers",
+        name="Ridge"
+    )
+)
 
-ax2.set_xlabel("Alpha")
-ax2.set_ylabel("R² Score")
+fig_alpha.add_trace(
+    go.Scatter(
+        x=alphas,
+        y=lasso_scores,
+        mode="lines+markers",
+        name="Lasso"
+    )
+)
 
-ax2.legend()
+fig_alpha.update_layout(
+    xaxis_title="Alpha",
+    yaxis_title="R² Score"
+)
 
-st.pyplot(fig2)
-
-# ---------------------------------------------------
-# COEFFICIENT COMPARISON
-# ---------------------------------------------------
-st.subheader("📌 Coefficient Comparison")
-
-coef_df = pd.DataFrame({
-    "Feature": X.columns,
-    "Linear": linear.coef_,
-    "Ridge": ridge.coef_,
-    "Lasso": lasso.coef_
-}).set_index("Feature")
-
-fig3, ax3 = plt.subplots(figsize=(10,5))
-
-coef_df.plot(kind="bar", ax=ax3)
-
-st.pyplot(fig3)
+st.plotly_chart(fig_alpha,use_container_width=True)
 
 # ---------------------------------------------------
 # FEATURE IMPORTANCE
 # ---------------------------------------------------
-st.subheader("🏆 Feature Importance (Ridge Model)")
+st.subheader("🏆 Feature Importance (Ridge)")
 
 importance = pd.DataFrame({
-    "Feature": X.columns,
-    "Importance": abs(ridge.coef_)
+    "Feature":X.columns,
+    "Importance":abs(ridge.coef_)
 })
 
 importance = importance.sort_values(
     by="Importance",
-    ascending=False
+    ascending=True
 )
 
-fig4, ax4 = plt.subplots()
-
-ax4.barh(
-    importance["Feature"],
-    importance["Importance"]
+fig_imp = px.bar(
+    importance,
+    x="Importance",
+    y="Feature",
+    orientation="h"
 )
 
-ax4.invert_yaxis()
+st.plotly_chart(fig_imp,use_container_width=True)
 
-st.pyplot(fig4)
+# ---------------------------------------------------
+# ACTUAL VS PREDICTED
+# ---------------------------------------------------
+st.subheader("📊 Actual vs Predicted MPG")
+
+fig_scatter = px.scatter(
+    x=y_test,
+    y=ridge_pred,
+    labels={"x":"Actual MPG","y":"Predicted MPG"}
+)
+
+st.plotly_chart(fig_scatter,use_container_width=True)
 
 # ---------------------------------------------------
 # RESIDUAL ANALYSIS
@@ -279,60 +273,48 @@ st.subheader("📉 Residual Analysis")
 
 residuals = y_test - ridge_pred
 
-fig5, ax5 = plt.subplots()
-
-ax5.scatter(y_test, residuals)
-
-ax5.axhline(y=0)
-
-ax5.set_xlabel("Actual MPG")
-ax5.set_ylabel("Residuals")
-
-st.pyplot(fig5)
-
-# ---------------------------------------------------
-# ACTUAL VS PREDICTED
-# ---------------------------------------------------
-st.subheader("📈 Actual vs Predicted MPG")
-
-fig6, ax6 = plt.subplots()
-
-ax6.scatter(y_test, ridge_pred)
-
-ax6.plot(
-    [y_test.min(), y_test.max()],
-    [y_test.min(), y_test.max()]
+fig_res = px.scatter(
+    x=y_test,
+    y=residuals,
+    labels={"x":"Actual MPG","y":"Residual"}
 )
 
-ax6.set_xlabel("Actual MPG")
-ax6.set_ylabel("Predicted MPG")
+fig_res.add_hline(y=0)
 
-st.pyplot(fig6)
+st.plotly_chart(fig_res,use_container_width=True)
 
 # ---------------------------------------------------
+# SIDEBAR PREDICTION
 # ---------------------------------------------------
-# PREDICTION SECTION
-# ---------------------------------------------------
-    # Create dataframe
+if predict_button:
+
+    input_data = {
+        "cylinders":cyl,
+        "displacement":disp,
+        "horsepower":hp,
+        "weight":wt,
+        "acceleration":acc,
+        "model_year":yr
+    }
+
     input_df = pd.DataFrame([input_data])
 
-    # Add origin columns
-    input_df["origin_america"] = 1 if origin == "america" else 0
-    input_df["origin_europe"] = 1 if origin == "europe" else 0
-    input_df["origin_asia"] = 1 if origin == "asia" else 0
+    input_df["origin_america"] = 1 if origin=="america" else 0
+    input_df["origin_europe"] = 1 if origin=="europe" else 0
+    input_df["origin_asia"] = 1 if origin=="asia" else 0
 
-    # Add any missing columns from training data
     for col in X.columns:
         if col not in input_df.columns:
             input_df[col] = 0
 
-    # Ensure same column order
     input_df = input_df[X.columns]
 
-    # Scale input
     input_scaled = scaler.transform(input_df)
 
-    # Predict
-    prediction = ridge.predict(input_scaled)
+    lin_prediction = linear.predict(input_scaled)[0]
+    ridge_prediction = ridge.predict(input_scaled)[0]
+    lasso_prediction = lasso.predict(input_scaled)[0]
 
-    st.success(f"🚗 Estimated MPG: {round(prediction[0],2)}")
+    st.sidebar.success(
+        f"🚗 Estimated MPG (Ridge): {round(ridge_prediction,2)}"
+    )

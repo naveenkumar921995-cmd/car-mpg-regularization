@@ -310,26 +310,48 @@ ax6.set_ylabel("Predicted MPG")
 st.pyplot(fig6)
 
 # ---------------------------------------------------
-# PREDICTION
 # ---------------------------------------------------
-if predict_button:
+# PREDICTION SECTION
+# ---------------------------------------------------
+st.subheader("🔮 Predict MPG for New Car")
 
-    input_df = pd.DataFrame([{
-        "cyl": cyl,
-        "disp": disp,
-        "hp": hp,
-        "wt": wt,
-        "acc": acc,
-        "yr": yr,
-        "origin_america": 1 if origin=="america" else 0,
-        "origin_europe": 1 if origin=="europe" else 0,
-        "origin_asia": 1 if origin=="asia" else 0,
-    }])
+input_data = {}
 
+colA, colB = st.columns(2)
+
+with colA:
+    input_data["cyl"] = st.number_input("Cylinders", 3, 12, 4)
+    input_data["disp"] = st.number_input("Displacement", 50.0, 500.0, 150.0)
+    input_data["hp"] = st.number_input("Horsepower", 40.0, 300.0, 100.0)
+    input_data["wt"] = st.number_input("Weight", 1500.0, 5000.0, 2500.0)
+
+with colB:
+    input_data["acc"] = st.number_input("Acceleration", 8.0, 25.0, 15.0)
+    input_data["yr"] = st.number_input("Model Year", 70, 82, 76)
+    origin = st.selectbox("Origin", ["america", "europe", "asia"])
+
+if st.button("Predict MPG"):
+
+    # Create dataframe
+    input_df = pd.DataFrame([input_data])
+
+    # Add origin columns
+    input_df["origin_america"] = 1 if origin == "america" else 0
+    input_df["origin_europe"] = 1 if origin == "europe" else 0
+    input_df["origin_asia"] = 1 if origin == "asia" else 0
+
+    # Add any missing columns from training data
+    for col in X.columns:
+        if col not in input_df.columns:
+            input_df[col] = 0
+
+    # Ensure same column order
     input_df = input_df[X.columns]
 
+    # Scale input
     input_scaled = scaler.transform(input_df)
 
+    # Predict
     prediction = ridge.predict(input_scaled)
 
     st.success(f"🚗 Estimated MPG: {round(prediction[0],2)}")
